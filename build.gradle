@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'org.spongepowered.mixin' version '0.7.+'
 }
 
 group = mod_group
@@ -36,6 +37,7 @@ repositories {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
 }
 
 // The BRB integration must target the exact 1.20.1 release, not the main
@@ -55,3 +57,10 @@ jar {
         attributes('MixinConfigs': 'brbtabs.mixins.json')
     }
 }
+
+mixin {
+    add sourceSets.main, 'brbtabs.refmap.json'
+    config 'brbtabs.mixins.json'
+}
+
+jar.finalizedBy('reobfJar')
