@@ -32,7 +32,7 @@ public final class CreativeRecipeIndex {
         Map<ResourceLocation, List<CreativeModeTab>> tabsByItem = new LinkedHashMap<>();
 
         // The built-in ordered collection also includes tabs registered by mods.
-        for (CreativeModeTab tab : CreativeModeTabs.allTabs()) {
+        for (CreativeModeTab tab : net.minecraftforge.common.CreativeModeTabRegistry.getSortedCreativeModeTabs()) {
             ResourceLocation tabId = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
             if (tabId == null || tab.getType() != CreativeModeTab.Type.CATEGORY) {
                 continue;
