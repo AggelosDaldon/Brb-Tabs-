@@ -49,3 +49,9 @@ processResources {
         expand version: project.version
     }
 }
+
+jar {
+    manifest {
+        attributes('MixinConfigs': 'brbtabs.mixins.json')
+    }
+}
