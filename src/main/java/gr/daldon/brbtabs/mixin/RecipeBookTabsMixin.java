@@ -60,7 +60,11 @@ public abstract class RecipeBookTabsMixin {
 
     @Unique
     private boolean brbtabs$crafting() {
-        // The 2x2 Survival Inventory book uses a distinct recipe collection lifecycle.\n        // BRB instantcraft may not have initialized its ordered recipe cache there;\n        // overriding RecipeBookPage collections caused a render-thread NPE.\n        // Keep vanilla/BRB behavior in InventoryMenu until it has a dedicated safe path.\n        return menu instanceof CraftingMenu;
+        // The 2x2 Survival Inventory book uses a distinct recipe collection lifecycle.
+        // BRB instantcraft may not have initialized its ordered recipe cache there;
+        // overriding RecipeBookPage collections caused a render-thread NPE.
+        // Keep vanilla/BRB behavior in InventoryMenu until it has a dedicated safe path.
+        return menu instanceof CraftingMenu;
     }
 
     @Unique
