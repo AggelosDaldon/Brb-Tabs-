@@ -52,6 +52,7 @@ public abstract class RecipeBookTabsMixin {
     @Unique private int brbtabs$selected = 0;
     @Unique private int brbtabs$page = 0;
     @Unique private boolean brbtabs$searchAll = false;
+    @Unique private static final ResourceLocation BRBTABS_VANILLA_BOOK = new ResourceLocation("minecraft", "textures/gui/recipe_book.png");
     @Unique private static final int BRBTABS_PAGE_SIZE = 10;
     @Unique private static final int BRBTABS_COLUMNS = 2;
     @Unique private static final int BRBTABS_CELL = 22;
@@ -180,18 +181,42 @@ public abstract class RecipeBookTabsMixin {
         return top + 141;
     }
 
+    // The panel uses the actual vanilla 1.20.1 recipe-book atlas, including
+    // resource-pack replacements. Nine-slice the vanilla book background to
+    // keep its 1px borders and its native pixel density instead of scaling it.
+    @Unique
+    private void brbtabs$bookPanel(GuiGraphics gui, int x, int y) {
+        final int height = 166;
+        gui.blit(BRBTABS_VANILLA_BOOK, x, y, 0, 0, 8, height);
+        gui.blit(BRBTABS_VANILLA_BOOK, x + 8, y, 65, 0, 31, height);
+        gui.blit(BRBTABS_VANILLA_BOOK, x + 39, y, 139, 0, 8, height);
+    }
+
+    // Minecraft's default grey-beige widget bevel: no colored modern boxes.
+    @Unique
+    private void brbtabs$vanillaButton(GuiGraphics gui, int x, int y, int w, int h, boolean selected, boolean hovered) {
+        int edgeLight = selected ? 0xFFFFFFFF : 0xFFFFFFFF;
+        int edgeDark = 0xFF373737;
+        int face = selected ? 0xFFC6C6C6 : hovered ? 0xFFE0E0E0 : 0xFFC6C6C6;
+        gui.fill(x, y, x + w, y + h, 0xFF000000);
+        gui.fill(x + 1, y + 1, x + w - 1, y + h - 1, face);
+        gui.fill(x + 1, y + 1, x + w - 1, y + 2, selected ? edgeDark : edgeLight);
+        gui.fill(x + 1, y + 1, x + 2, y + h - 1, selected ? edgeDark : edgeLight);
+        gui.fill(x + 1, y + h - 2, x + w - 1, y + h - 1, selected ? edgeLight : edgeDark);
+        gui.fill(x + w - 2, y + 1, x + w - 1, y + h - 1, selected ? edgeLight : edgeDark);
+    }
+
     @Inject(method = "render", at = @At("TAIL"))
     private void brbtabs$renderTabs(GuiGraphics gui, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         if (!brbtabs$crafting() || brbtabs$tabs.isEmpty()) return;
         int x = brbtabs$left();
         int y = brbtabs$top();
 
-        // Search scope is explicit. ALL shows every recipe regardless of tab.
-        // TAB searches and browses only the selected Creative Mode tab.
-        gui.fill(x, y, x + 47, y + 21, brbtabs$searchAll ? 0xFF496D51 : 0xFF626C81);
-        gui.fill(x + 1, y + 1, x + 46, y + 20, 0xFF343638);
-        gui.drawCenteredString(minecraft.font, brbtabs$searchAll ? "ALL" : "TAB", x + 23, y + 6,
-            brbtabs$searchAll ? 0xFF8CE49D : 0xFFE8D5A5);
+        brbtabs$bookPanel(gui, x - 1, y - 2);
+
+        // Vanilla-style scope switch: TAB = current mod tab, ALL = all recipes.
+        brbtabs$vanillaButton(gui, x + 2, y + 3, 43, 19, brbtabs$searchAll, mouseX >= x + 2 && mouseX < x + 45 && mouseY >= y + 3 && mouseY < y + 22);
+        gui.drawCenteredString(minecraft.font, brbtabs$searchAll ? "ALL" : "TAB", x + 23, y + 8, 0xFF404040);
 
         int begin = brbtabs$page * BRBTABS_PAGE_SIZE;
         for (int i = begin; i < Math.min(begin + BRBTABS_PAGE_SIZE, brbtabs$tabs.size()); i++) {
@@ -200,16 +225,16 @@ public abstract class RecipeBookTabsMixin {
             int ty = brbtabs$tabY(y, offset);
             boolean selected = i == brbtabs$selected && !brbtabs$searchAll;
             boolean hovered = mouseX >= tx && mouseX < tx + BRBTABS_CELL && mouseY >= ty && mouseY < ty + BRBTABS_CELL;
-            gui.fill(tx, ty, tx + 22, ty + 22, selected ? 0xFFE0D5B9 : hovered ? 0xFFB5B09E : 0xFF77766F);
-            gui.fill(tx + 1, ty + 1, tx + 21, ty + 21, selected ? 0xFF9E8B69 : 0xFF45453F);
+            brbtabs$vanillaButton(gui, tx, ty, 22, 22, selected, hovered);
             gui.renderItem(brbtabs$tabs.get(i).getIconItem(), tx + 3, ty + 3);
         }
 
         int bottom = brbtabs$bottom(y);
-        gui.fill(x, bottom, x + 47, bottom + 18, 0xFF45453F);
-        gui.drawCenteredString(minecraft.font, "<", x + 11, bottom + 5, brbtabs$page > 0 ? 0xFFFFFFFF : 0xFF777777);
+        brbtabs$vanillaButton(gui, x, bottom, 23, 18, false, mouseX >= x && mouseX < x + 23 && mouseY >= bottom && mouseY < bottom + 18);
+        brbtabs$vanillaButton(gui, x + 24, bottom, 23, 18, false, mouseX >= x + 24 && mouseX < x + 47 && mouseY >= bottom && mouseY < bottom + 18);
+        gui.drawCenteredString(minecraft.font, "<", x + 11, bottom + 5, brbtabs$page > 0 ? 0xFF222222 : 0xFF888888);
         gui.drawCenteredString(minecraft.font, ">", x + 35, bottom + 5,
-            (brbtabs$page + 1) * BRBTABS_PAGE_SIZE < brbtabs$tabs.size() ? 0xFFFFFFFF : 0xFF777777);
+            (brbtabs$page + 1) * BRBTABS_PAGE_SIZE < brbtabs$tabs.size() ? 0xFF222222 : 0xFF888888);
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
