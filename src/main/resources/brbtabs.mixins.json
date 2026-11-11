@@ -1,1 +1,13 @@
-{"required":true,"minVersion":"0.8","package":"gr.daldon.brbtabs.mixin","compatibilityLevel":"JAVA_17","client":["RecipeBookTabsMixin"],"injectors":{"defaultRequire":1}}
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "gr.daldon.brbtabs.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "brbtabs.refmap.json",
+  "client": [
+    "RecipeBookTabsMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
