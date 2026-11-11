@@ -51,7 +51,10 @@ public abstract class RecipeBookTabsMixin {
     @Unique private final List<CreativeModeTab> brbtabs$tabs = new ArrayList<>();
     @Unique private int brbtabs$selected = 0;
     @Unique private int brbtabs$page = 0;
-    @Unique private static final int BRBTABS_PAGE_SIZE = 5;
+    @Unique private boolean brbtabs$searchAll = false;
+    @Unique private static final int BRBTABS_PAGE_SIZE = 10;
+    @Unique private static final int BRBTABS_COLUMNS = 2;
+    @Unique private static final int BRBTABS_CELL = 22;
 
     @Unique
     private boolean brbtabs$crafting() {
@@ -112,8 +115,10 @@ public abstract class RecipeBookTabsMixin {
 
         CreativeModeTab tab = brbtabs$tabs.get(brbtabs$selected);
         Set<ResourceLocation> accepted = new HashSet<>();
-        for (ItemStack stack : tab.getDisplayItems()) {
-            if (!stack.isEmpty()) accepted.add(BuiltInRegistries.ITEM.getKey(stack.getItem()));
+        if (!brbtabs$searchAll) {
+            for (ItemStack stack : tab.getDisplayItems()) {
+                if (!stack.isEmpty()) accepted.add(BuiltInRegistries.ITEM.getKey(stack.getItem()));
+            }
         }
 
         // Reuse the recipe book's OWN collections. Constructing one-recipe
@@ -128,7 +133,7 @@ public abstract class RecipeBookTabsMixin {
             boolean matches = false;
             for (Recipe<?> recipe : group.getRecipes()) {
                 ItemStack result = recipe.getResultItem(group.registryAccess());
-                if (result.isEmpty() || !accepted.contains(BuiltInRegistries.ITEM.getKey(result.getItem()))) continue;
+                if (result.isEmpty() || (!brbtabs$searchAll && !accepted.contains(BuiltInRegistries.ITEM.getKey(result.getItem())))) continue;
                 if (!query.isEmpty() && !result.getHoverName().getString().toLowerCase(java.util.Locale.ROOT).contains(query)
                     && !BuiltInRegistries.ITEM.getKey(result.getItem()).toString().contains(query)) continue;
                 matches = true;
@@ -152,12 +157,27 @@ public abstract class RecipeBookTabsMixin {
 
     @Unique
     private int brbtabs$left() {
-        return (width - 147) / 2 - xOffset - 27;
+        return (width - 147) / 2 - xOffset - 49;
     }
 
     @Unique
     private int brbtabs$top() {
-        return (height - 166) / 2 + 8;
+        return (height - 166) / 2 + 3;
+    }
+
+    @Unique
+    private int brbtabs$tabX(int left, int index) {
+        return left + (index % BRBTABS_COLUMNS) * 23;
+    }
+
+    @Unique
+    private int brbtabs$tabY(int top, int index) {
+        return top + 24 + (index / BRBTABS_COLUMNS) * 23;
+    }
+
+    @Unique
+    private int brbtabs$bottom(int top) {
+        return top + 141;
     }
 
     @Inject(method = "render", at = @At("TAIL"))
@@ -165,21 +185,31 @@ public abstract class RecipeBookTabsMixin {
         if (!brbtabs$crafting() || brbtabs$tabs.isEmpty()) return;
         int x = brbtabs$left();
         int y = brbtabs$top();
+
+        // Search scope is explicit. ALL shows every recipe regardless of tab.
+        // TAB searches and browses only the selected Creative Mode tab.
+        gui.fill(x, y, x + 47, y + 21, brbtabs$searchAll ? 0xFF496D51 : 0xFF626C81);
+        gui.fill(x + 1, y + 1, x + 46, y + 20, 0xFF343638);
+        gui.drawCenteredString(minecraft.font, brbtabs$searchAll ? "ALL" : "TAB", x + 23, y + 6,
+            brbtabs$searchAll ? 0xFF8CE49D : 0xFFE8D5A5);
+
         int begin = brbtabs$page * BRBTABS_PAGE_SIZE;
         for (int i = begin; i < Math.min(begin + BRBTABS_PAGE_SIZE, brbtabs$tabs.size()); i++) {
-            int pos = i - begin;
-            int ty = y + 21 + pos * 23;
-            boolean selected = i == brbtabs$selected;
-            boolean hovered = mouseX >= x && mouseX < x + 24 && mouseY >= ty && mouseY < ty + 22;
-            gui.fill(x, ty, x + 24, ty + 22, selected ? 0xFFE0D5B9 : hovered ? 0xFFB5B09E : 0xFF77766F);
-            gui.fill(x + 1, ty + 1, x + 23, ty + 21, selected ? 0xFF9E8B69 : 0xFF45453F);
-            gui.renderItem(brbtabs$tabs.get(i).getIconItem(), x + 4, ty + 3);
+            int offset = i - begin;
+            int tx = brbtabs$tabX(x, offset);
+            int ty = brbtabs$tabY(y, offset);
+            boolean selected = i == brbtabs$selected && !brbtabs$searchAll;
+            boolean hovered = mouseX >= tx && mouseX < tx + BRBTABS_CELL && mouseY >= ty && mouseY < ty + BRBTABS_CELL;
+            gui.fill(tx, ty, tx + 22, ty + 22, selected ? 0xFFE0D5B9 : hovered ? 0xFFB5B09E : 0xFF77766F);
+            gui.fill(tx + 1, ty + 1, tx + 21, ty + 21, selected ? 0xFF9E8B69 : 0xFF45453F);
+            gui.renderItem(brbtabs$tabs.get(i).getIconItem(), tx + 3, ty + 3);
         }
-        gui.fill(x, y, x + 24, y + 19, 0xFF45453F);
-        gui.drawCenteredString(minecraft.font, "▲", x + 12, y + 5, 0xFFFFFFFF);
-        int bottom = y + 138;
-        gui.fill(x, bottom, x + 24, bottom + 19, 0xFF45453F);
-        gui.drawCenteredString(minecraft.font, "▼", x + 12, bottom + 5, 0xFFFFFFFF);
+
+        int bottom = brbtabs$bottom(y);
+        gui.fill(x, bottom, x + 47, bottom + 18, 0xFF45453F);
+        gui.drawCenteredString(minecraft.font, "<", x + 11, bottom + 5, brbtabs$page > 0 ? 0xFFFFFFFF : 0xFF777777);
+        gui.drawCenteredString(minecraft.font, ">", x + 35, bottom + 5,
+            (brbtabs$page + 1) * BRBTABS_PAGE_SIZE < brbtabs$tabs.size() ? 0xFFFFFFFF : 0xFF777777);
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
@@ -187,22 +217,30 @@ public abstract class RecipeBookTabsMixin {
         if (!brbtabs$crafting() || brbtabs$tabs.isEmpty() || button != 0) return;
         int x = brbtabs$left();
         int y = brbtabs$top();
-        if (mouseX < x || mouseX >= x + 24) return;
-        if (mouseY >= y && mouseY < y + 19) {
-            brbtabs$page = Math.max(0, brbtabs$page - 1);
+        if (mouseX < x || mouseX >= x + 47) return;
+
+        if (mouseY >= y && mouseY < y + 21) {
+            brbtabs$searchAll = !brbtabs$searchAll;
+            brbtabs$refresh(true);
             cir.setReturnValue(true);
             return;
         }
-        if (mouseY >= y + 138 && mouseY < y + 157) {
-            brbtabs$page = Math.min((brbtabs$tabs.size() - 1) / BRBTABS_PAGE_SIZE, brbtabs$page + 1);
+
+        int bottom = brbtabs$bottom(y);
+        if (mouseY >= bottom && mouseY < bottom + 18) {
+            if (mouseX < x + 23) brbtabs$page = Math.max(0, brbtabs$page - 1);
+            else brbtabs$page = Math.min((brbtabs$tabs.size() - 1) / BRBTABS_PAGE_SIZE, brbtabs$page + 1);
             cir.setReturnValue(true);
             return;
         }
+
         int begin = brbtabs$page * BRBTABS_PAGE_SIZE;
         for (int i = begin; i < Math.min(begin + BRBTABS_PAGE_SIZE, brbtabs$tabs.size()); i++) {
-            int ty = y + 21 + (i - begin) * 23;
-            if (mouseY >= ty && mouseY < ty + 22) {
+            int tx = brbtabs$tabX(x, i - begin);
+            int ty = brbtabs$tabY(y, i - begin);
+            if (mouseX >= tx && mouseX < tx + BRBTABS_CELL && mouseY >= ty && mouseY < ty + BRBTABS_CELL) {
                 brbtabs$selected = i;
+                brbtabs$searchAll = false;
                 brbtabs$refresh(true);
                 cir.setReturnValue(true);
                 return;
@@ -215,11 +253,22 @@ public abstract class RecipeBookTabsMixin {
         if (!brbtabs$crafting() || brbtabs$tabs.isEmpty()) return;
         int left = brbtabs$left();
         int top = brbtabs$top();
-        if (mouseX < left || mouseX >= left + 24) return;
+        if (mouseX < left || mouseX >= left + 47) return;
+
+        if (mouseY >= top && mouseY < top + 21) {
+            gui.renderTooltip(minecraft.font,
+                net.minecraft.network.chat.Component.literal(brbtabs$searchAll
+                    ? "Search: ALL recipes (click for selected tab)"
+                    : "Search: selected Creative tab (click for ALL)"),
+                mouseX, mouseY);
+            return;
+        }
+
         int begin = brbtabs$page * BRBTABS_PAGE_SIZE;
         for (int i = begin; i < Math.min(begin + BRBTABS_PAGE_SIZE, brbtabs$tabs.size()); i++) {
-            int ty = top + 21 + (i - begin) * 23;
-            if (mouseY >= ty && mouseY < ty + 22) {
+            int tx = brbtabs$tabX(left, i - begin);
+            int ty = brbtabs$tabY(top, i - begin);
+            if (mouseX >= tx && mouseX < tx + BRBTABS_CELL && mouseY >= ty && mouseY < ty + BRBTABS_CELL) {
                 gui.renderTooltip(minecraft.font, brbtabs$tabs.get(i).getDisplayName(), mouseX, mouseY);
                 return;
             }
