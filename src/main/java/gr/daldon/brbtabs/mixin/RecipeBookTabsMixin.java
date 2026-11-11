@@ -47,6 +47,7 @@ public abstract class RecipeBookTabsMixin {
     @Shadow protected RecipeBookMenu<?> menu;
     @Shadow @Final private RecipeBookPage recipeBookPage;
     @Shadow @Final private List<RecipeBookTabButton> tabButtons;
+    @Shadow public abstract boolean isVisible();
 
     @Unique private final List<CreativeModeTab> brbtabs$tabs = new ArrayList<>();
     @Unique private int brbtabs$selected = 0;
@@ -151,7 +152,7 @@ public abstract class RecipeBookTabsMixin {
     // BRB's own updateCollections injections can replace the standard result.
     @Inject(method = "updateCollections", at = @At("HEAD"), cancellable = true)
     private void brbtabs$filter(boolean resetPage, CallbackInfo ci) {
-        if (!brbtabs$crafting() || brbtabs$tabs.isEmpty()) return;
+        if (!brbtabs$crafting() || !isVisible() || brbtabs$tabs.isEmpty()) return;
         brbtabs$refresh(resetPage);
         ci.cancel();
     }
@@ -192,18 +193,38 @@ public abstract class RecipeBookTabsMixin {
         gui.blit(BRBTABS_VANILLA_BOOK, x + 39, y, 139, 0, 8, height);
     }
 
-    // Minecraft's default grey-beige widget bevel: no colored modern boxes.
+    // Creative Inventory inspired beveled tabs: the selected item is raised,
+    // bright, and visibly joined to the book panel. No blurred or shaded text.
     @Unique
-    private void brbtabs$vanillaButton(GuiGraphics gui, int x, int y, int w, int h, boolean selected, boolean hovered) {
-        int edgeLight = selected ? 0xFFFFFFFF : 0xFFFFFFFF;
-        int edgeDark = 0xFF373737;
-        int face = selected ? 0xFFC6C6C6 : hovered ? 0xFFE0E0E0 : 0xFFC6C6C6;
-        gui.fill(x, y, x + w, y + h, 0xFF000000);
+    private void brbtabs$tabButton(GuiGraphics gui, int x, int y, boolean selected, boolean hovered) {
+        int face = selected ? 0xFFF1F1F1 : hovered ? 0xFFDFDFDF : 0xFFC6C6C6;
+        gui.fill(x, y, x + 22, y + 22, 0xFF111111);
+        gui.fill(x + 1, y + 1, x + 21, y + 21, face);
+        gui.fill(x + 1, y + 1, x + 21, y + 3, 0xFFFFFFFF);
+        gui.fill(x + 1, y + 1, x + 3, y + 21, 0xFFFFFFFF);
+        gui.fill(x + 1, y + 19, x + 21, y + 21, selected ? 0xFFEFEFEF : 0xFF5B5B5B);
+        gui.fill(x + 19, y + 1, x + 21, y + 21, selected ? 0xFFEFEFEF : 0xFF5B5B5B);
+        if (selected) {
+            // Bright border makes the active mod tab easy to identify.
+            gui.fill(x + 3, y + 3, x + 19, y + 4, 0xFFFFFFFF);
+            gui.fill(x + 3, y + 18, x + 19, y + 19, 0xFFFAFAFA);
+        }
+    }
+
+    @Unique
+    private void brbtabs$smallButton(GuiGraphics gui, int x, int y, int w, int h, boolean pressed, boolean hovered) {
+        int face = pressed ? 0xFFAAAAAA : hovered ? 0xFFE1E1E1 : 0xFFC6C6C6;
+        gui.fill(x, y, x + w, y + h, 0xFF161616);
         gui.fill(x + 1, y + 1, x + w - 1, y + h - 1, face);
-        gui.fill(x + 1, y + 1, x + w - 1, y + 2, selected ? edgeDark : edgeLight);
-        gui.fill(x + 1, y + 1, x + 2, y + h - 1, selected ? edgeDark : edgeLight);
-        gui.fill(x + 1, y + h - 2, x + w - 1, y + h - 1, selected ? edgeLight : edgeDark);
-        gui.fill(x + w - 2, y + 1, x + w - 1, y + h - 1, selected ? edgeLight : edgeDark);
+        gui.fill(x + 1, y + 1, x + w - 1, y + 2, pressed ? 0xFF525252 : 0xFFFFFFFF);
+        gui.fill(x + 1, y + 1, x + 2, y + h - 1, pressed ? 0xFF525252 : 0xFFFFFFFF);
+        gui.fill(x + 1, y + h - 2, x + w - 1, y + h - 1, pressed ? 0xFFFFFFFF : 0xFF555555);
+        gui.fill(x + w - 2, y + 1, x + w - 1, y + h - 1, pressed ? 0xFFFFFFFF : 0xFF555555);
+    }
+
+    @Unique
+    private void brbtabs$flatCenteredText(GuiGraphics gui, String value, int centerX, int baselineY, int color) {
+        gui.drawString(minecraft.font, value, centerX - minecraft.font.width(value) / 2, baselineY, color, false);
     }
 
     @Inject(method = "render", at = @At("TAIL"))
@@ -215,8 +236,9 @@ public abstract class RecipeBookTabsMixin {
         brbtabs$bookPanel(gui, x - 1, y - 2);
 
         // Vanilla-style scope switch: TAB = current mod tab, ALL = all recipes.
-        brbtabs$vanillaButton(gui, x + 2, y + 3, 43, 19, brbtabs$searchAll, mouseX >= x + 2 && mouseX < x + 45 && mouseY >= y + 3 && mouseY < y + 22);
-        gui.drawCenteredString(minecraft.font, brbtabs$searchAll ? "ALL" : "TAB", x + 23, y + 8, 0xFF404040);
+        brbtabs$smallButton(gui, x + 4, y + 4, 39, 17, brbtabs$searchAll,
+            mouseX >= x + 4 && mouseX < x + 43 && mouseY >= y + 4 && mouseY < y + 21);
+        brbtabs$flatCenteredText(gui, brbtabs$searchAll ? "ALL" : "TAB", x + 23, y + 8, 0xFF333333);
 
         int begin = brbtabs$page * BRBTABS_PAGE_SIZE;
         for (int i = begin; i < Math.min(begin + BRBTABS_PAGE_SIZE, brbtabs$tabs.size()); i++) {
@@ -225,15 +247,15 @@ public abstract class RecipeBookTabsMixin {
             int ty = brbtabs$tabY(y, offset);
             boolean selected = i == brbtabs$selected && !brbtabs$searchAll;
             boolean hovered = mouseX >= tx && mouseX < tx + BRBTABS_CELL && mouseY >= ty && mouseY < ty + BRBTABS_CELL;
-            brbtabs$vanillaButton(gui, tx, ty, 22, 22, selected, hovered);
+            brbtabs$tabButton(gui, tx, ty, selected, hovered);
             gui.renderItem(brbtabs$tabs.get(i).getIconItem(), tx + 3, ty + 3);
         }
 
         int bottom = brbtabs$bottom(y);
-        brbtabs$vanillaButton(gui, x, bottom, 23, 18, false, mouseX >= x && mouseX < x + 23 && mouseY >= bottom && mouseY < bottom + 18);
-        brbtabs$vanillaButton(gui, x + 24, bottom, 23, 18, false, mouseX >= x + 24 && mouseX < x + 47 && mouseY >= bottom && mouseY < bottom + 18);
-        gui.drawCenteredString(minecraft.font, "<", x + 11, bottom + 5, brbtabs$page > 0 ? 0xFF222222 : 0xFF888888);
-        gui.drawCenteredString(minecraft.font, ">", x + 35, bottom + 5,
+        brbtabs$smallButton(gui, x, bottom, 23, 18, false, mouseX >= x && mouseX < x + 23 && mouseY >= bottom && mouseY < bottom + 18);
+        brbtabs$smallButton(gui, x + 24, bottom, 23, 18, false, mouseX >= x + 24 && mouseX < x + 47 && mouseY >= bottom && mouseY < bottom + 18);
+        brbtabs$flatCenteredText(gui, "<", x + 11, bottom + 5, brbtabs$page > 0 ? 0xFF222222 : 0xFF888888);
+        brbtabs$flatCenteredText(gui, ">", x + 35, bottom + 5,
             (brbtabs$page + 1) * BRBTABS_PAGE_SIZE < brbtabs$tabs.size() ? 0xFF222222 : 0xFF888888);
     }
 
