@@ -6,6 +6,7 @@ import net.minecraft.client.RecipeBookCategories;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.recipebook.RecipeBookComponent;
 import net.minecraft.client.gui.screens.recipebook.RecipeBookPage;
+import net.minecraft.client.gui.screens.recipebook.RecipeBookTabButton;
 import net.minecraft.client.gui.screens.recipebook.RecipeCollection;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -45,6 +46,7 @@ public abstract class RecipeBookTabsMixin {
     @Shadow private String lastSearch;
     @Shadow protected RecipeBookMenu<?> menu;
     @Shadow @Final private RecipeBookPage recipeBookPage;
+    @Shadow @Final private List<RecipeBookTabButton> tabButtons;
 
     @Unique private final List<CreativeModeTab> brbtabs$tabs = new ArrayList<>();
     @Unique private int brbtabs$selected = 0;
@@ -82,7 +84,25 @@ public abstract class RecipeBookTabsMixin {
     private void brbtabs$initTabs(CallbackInfo ci) {
         if (!brbtabs$crafting()) return;
         brbtabs$rebuildTabs();
+        brbtabs$hideOriginalTabs();
         brbtabs$refresh(false);
+    }
+
+    // Keep vanilla/BRB category buttons in the component so vanilla state and
+    // other BRB mixins continue to work; only disable their visual hit areas.
+    // Removing them from the list risks breaking vanilla's selected tab logic.
+    @Unique
+    private void brbtabs$hideOriginalTabs() {
+        if (!brbtabs$crafting()) return;
+        for (RecipeBookTabButton tab : tabButtons) {
+            tab.visible = false;
+        }
+    }
+
+    // Other mods may call initVisuals or update tab visibility again.
+    @Inject(method = "render", at = @At("HEAD"))
+    private void brbtabs$keepOriginalTabsHidden(GuiGraphics gui, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+        brbtabs$hideOriginalTabs();
     }
 
     @Unique
