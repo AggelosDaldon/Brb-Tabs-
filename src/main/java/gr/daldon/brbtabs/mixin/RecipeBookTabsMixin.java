@@ -42,6 +42,7 @@ public abstract class RecipeBookTabsMixin {
     @Shadow private int xOffset;
     @Shadow protected Minecraft minecraft;
     @Shadow private ClientRecipeBook book;
+    @Shadow private String lastSearch;
     @Shadow protected RecipeBookMenu<?> menu;
     @Shadow @Final private RecipeBookPage recipeBookPage;
 
@@ -100,6 +101,9 @@ public abstract class RecipeBookTabsMixin {
             for (Recipe<?> recipe : group.getRecipes()) {
                 ItemStack result = recipe.getResultItem(group.registryAccess());
                 if (result.isEmpty() || !accepted.contains(BuiltInRegistries.ITEM.getKey(result.getItem()))) continue;
+                String query = lastSearch == null ? "" : lastSearch.strip().toLowerCase(java.util.Locale.ROOT);
+                if (!query.isEmpty() && !result.getHoverName().getString().toLowerCase(java.util.Locale.ROOT).contains(query)
+                    && !BuiltInRegistries.ITEM.getKey(result.getItem()).toString().contains(query)) continue;
                 // Retain the identity of every recipe. BRB supports ungrouped recipes.
                 RecipeCollection single = new RecipeCollection(group.registryAccess(), List.of(recipe));
                 single.updateKnownRecipes(book);
