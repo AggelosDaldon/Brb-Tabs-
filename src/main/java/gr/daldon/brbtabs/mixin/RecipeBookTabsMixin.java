@@ -96,20 +96,26 @@ public abstract class RecipeBookTabsMixin {
             if (!stack.isEmpty()) accepted.add(BuiltInRegistries.ITEM.getKey(stack.getItem()));
         }
 
+        // Reuse the recipe book's OWN collections. Constructing one-recipe
+        // collections here broke BRB's instant-craft state, leaving its
+        // RecipeButton.getOrderedRecipes() without a cached clicked recipe
+        // and crashing on new ArrayList<>(null) in modded modpacks.
+        // This can include other results in the same vanilla recipe group;
+        // safe recipe separation needs a later dedicated implementation.
         List<RecipeCollection> entries = new ArrayList<>();
+        String query = lastSearch == null ? "" : lastSearch.strip().toLowerCase(java.util.Locale.ROOT);
         for (RecipeCollection group : book.getCollection(RecipeBookCategories.CRAFTING_SEARCH)) {
+            boolean matches = false;
             for (Recipe<?> recipe : group.getRecipes()) {
                 ItemStack result = recipe.getResultItem(group.registryAccess());
                 if (result.isEmpty() || !accepted.contains(BuiltInRegistries.ITEM.getKey(result.getItem()))) continue;
-                String query = lastSearch == null ? "" : lastSearch.strip().toLowerCase(java.util.Locale.ROOT);
                 if (!query.isEmpty() && !result.getHoverName().getString().toLowerCase(java.util.Locale.ROOT).contains(query)
                     && !BuiltInRegistries.ITEM.getKey(result.getItem()).toString().contains(query)) continue;
-                // Retain the identity of every recipe. BRB supports ungrouped recipes.
-                RecipeCollection single = new RecipeCollection(group.registryAccess(), List.of(recipe));
-                single.updateKnownRecipes(book);
-                if (!book.isFiltering(menu) || single.hasCraftable()) {
-                    entries.add(single);
-                }
+                matches = true;
+                break;
+            }
+            if (matches && (!book.isFiltering(menu) || group.hasCraftable())) {
+                entries.add(group);
             }
         }
         recipeBookPage.updateCollections(entries, resetPage);
