@@ -60,7 +60,7 @@ public abstract class RecipeBookTabsMixin {
         ResourceLocation previous = brbtabs$tabs.isEmpty()
             ? null : BuiltInRegistries.CREATIVE_MODE_TAB.getKey(brbtabs$tabs.get(Math.min(brbtabs$selected, brbtabs$tabs.size() - 1)));
         brbtabs$tabs.clear();
-        for (CreativeModeTab tab : CreativeModeTabs.allTabs()) {
+        for (CreativeModeTab tab : net.minecraftforge.common.CreativeModeTabRegistry.getSortedCreativeModeTabs()) {
             if (tab.getType() == CreativeModeTab.Type.CATEGORY) {
                 brbtabs$tabs.add(tab);
             }
@@ -143,7 +143,7 @@ public abstract class RecipeBookTabsMixin {
             boolean hovered = mouseX >= x && mouseX < x + 24 && mouseY >= ty && mouseY < ty + 22;
             gui.fill(x, ty, x + 24, ty + 22, selected ? 0xFFE0D5B9 : hovered ? 0xFFB5B09E : 0xFF77766F);
             gui.fill(x + 1, ty + 1, x + 23, ty + 21, selected ? 0xFF9E8B69 : 0xFF45453F);
-            gui.renderItem(brbtabs$tabs.get(i).getIcon(), x + 4, ty + 3);
+            gui.renderItem(brbtabs$tabs.get(i).getIconItem(), x + 4, ty + 3);
         }
         gui.fill(x, y, x + 24, y + 19, 0xFF45453F);
         gui.drawCenteredString(minecraft.font, "▲", x + 12, y + 5, 0xFFFFFFFF);
