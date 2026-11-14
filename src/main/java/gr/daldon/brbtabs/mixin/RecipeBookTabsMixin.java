@@ -16,6 +16,7 @@ import net.minecraft.world.inventory.RecipeBookMenu;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Recipe;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -53,6 +54,7 @@ public abstract class RecipeBookTabsMixin {
     @Unique private int brbtabs$selected = 0;
     @Unique private int brbtabs$page = 0;
     @Unique private boolean brbtabs$searchAll = false;
+    @Unique private final Set<ResourceLocation> brbtabs$brokenIcons = new HashSet<>();
     @Unique private static final ResourceLocation BRBTABS_VANILLA_BOOK = new ResourceLocation("minecraft", "textures/gui/recipe_book.png");
     @Unique private static final int BRBTABS_PAGE_SIZE = 10;
     @Unique private static final int BRBTABS_COLUMNS = 2;
@@ -231,9 +233,28 @@ public abstract class RecipeBookTabsMixin {
         gui.drawString(minecraft.font, value, centerX - minecraft.font.width(value) / 2, baselineY, color, false);
     }
 
+    // Some other mods register a Creative Tab with an icon supplier that
+    // dereferences an unregistered RegistryObject. Never let that supplier
+    // crash the Recipe Book. Keep the tab and display a safe vanilla icon.
+    @Unique
+    private ItemStack brbtabs$safeIcon(CreativeModeTab tab) {
+        ResourceLocation id = BuiltInRegistries.CREATIVE_MODE_TAB.getKey(tab);
+        if (id != null && brbtabs$brokenIcons.contains(id)) return new ItemStack(Items.BOOK);
+        try {
+            ItemStack icon = tab.getIconItem();
+            return icon == null || icon.isEmpty() ? new ItemStack(Items.BOOK) : icon;
+        } catch (RuntimeException e) {
+            if (id != null && brbtabs$brokenIcons.add(id)) {
+                org.slf4j.LoggerFactory.getLogger("BRB Tabs").warn(
+                    "Creative tab {} has a broken icon supplier. Showing book fallback instead.", id, e);
+            }
+            return new ItemStack(Items.BOOK);
+        }
+    }
+
     @Inject(method = "render", at = @At("TAIL"))
     private void brbtabs$renderTabs(GuiGraphics gui, int mouseX, int mouseY, float delta, CallbackInfo ci) {
-        if (!brbtabs$crafting() || brbtabs$tabs.isEmpty()) return;
+        if (!brbtabs$crafting() || !isVisible() || brbtabs$tabs.isEmpty()) return;
         int x = brbtabs$left();
         int y = brbtabs$top();
 
@@ -252,7 +273,7 @@ public abstract class RecipeBookTabsMixin {
             boolean selected = i == brbtabs$selected && !brbtabs$searchAll;
             boolean hovered = mouseX >= tx && mouseX < tx + BRBTABS_CELL && mouseY >= ty && mouseY < ty + BRBTABS_CELL;
             brbtabs$tabButton(gui, tx, ty, selected, hovered);
-            gui.renderItem(brbtabs$tabs.get(i).getIconItem(), tx + 3, ty + 3);
+            gui.renderItem(brbtabs$safeIcon(brbtabs$tabs.get(i)), tx + 3, ty + 3);
         }
 
         int bottom = brbtabs$bottom(y);
